@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import Login from './auth/login.jsx'; // Fixed: lowercase login.jsx
+import Login from './auth/login.jsx';
 import Register from './auth/Register.jsx';
 import ChatWindow from './components/ChatWindow.jsx';
 import AdminDashboard from './admin/AdminDashboard.jsx';
