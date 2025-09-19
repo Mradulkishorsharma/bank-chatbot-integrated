@@ -8,11 +8,7 @@
     "dev": "vite --host",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "start": "concurrently \"npm run dev\" \"cd ../backend && python app.py\"",
-    "start:full": "concurrently \"npm run dev\" \"cd ../backend && python nlu_service.py --serve\" \"cd ../backend && python app.py\"",
-    "train": "cd ../backend && python train_model.py",
-    "setup": "cd ../backend && python -m pip install -r requirements.txt && python train_model.py"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -41,7 +37,7 @@
   },
   "keywords": [
     "react",
-    "vite",
+    "vite", 
     "banking",
     "chatbot",
     "ai",

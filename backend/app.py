@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, make_response
+from flask import Flask, request, jsonify, make_response, render_template, send_from_directory
 from flask_cors import CORS
 from datetime import datetime, timedelta, timezone
 from functools import wraps
@@ -9,10 +9,11 @@ import uuid
 import csv
 import io
 import re
+import os
 
 # Import ML NLU service
 try:
-    from nlu_service_enhanced import analyze_query
+    from nlu_service import analyze_query
     print("✅ Enhanced ML NLU Service imported successfully")
 except ImportError:
     try:
@@ -22,13 +23,22 @@ except ImportError:
         print("⚠️ ML NLU Service not available, using fallback")
         analyze_query = None
 
-app = Flask(__name__)
+# Flask app को React build folder point करें
+app = Flask(__name__, 
+            static_folder='../frontend/dist',  # Frontend build output
+            template_folder='../frontend/dist')
+
 app.config['SECRET_KEY'] = 'securebank_jwt_secret_key_2024'
 CORS(app, origins=["http://localhost:5173", "http://127.0.0.1:5173"])
 
-@app.route("/")
-def root():
-    return jsonify({"status": "Enhanced ML-Powered Banking API", "version": "3.0", "ml_enabled": analyze_query is not None}), 200
+# React app serve करने के लिए catch-all route
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_react_app(path):
+    if path != "" and os.path.exists(app.static_folder + '/' + path):
+        return send_from_directory(app.static_folder, path)
+    else:
+        return render_template('index.html')
 
 # Users DB
 USERS_DB = {
@@ -117,22 +127,21 @@ def token_required(f):
         token = request.headers.get('Authorization')
         if not token:
             return jsonify({'message': 'Token is missing'}), 401
-
         try:
             token = token.split(' ')[1]  # Remove 'Bearer ' prefix
             payload = verify_token(token)
             if not payload:
                 return jsonify({'message': 'Token is invalid'}), 401
-
+            
             # Find user data
             user_email = payload['email']
             if user_email not in USERS_DB:
                 return jsonify({'message': 'User not found'}), 401
-
+            
             request.current_user = USERS_DB[user_email]
         except Exception:
             return jsonify({'message': 'Token is invalid'}), 401
-
+        
         return f(*args, **kwargs)
     return decorated
 
@@ -155,21 +164,21 @@ def register():
         email = data.get('email', '').strip().lower()
         password = data.get('password', '')
         role = data.get('role', 'user')
-
+        
         # Validation
         if not all([name, email, password]):
             return jsonify({'message': 'All fields are required'}), 400
-
+        
         if email in USERS_DB:
             return jsonify({'message': 'User already exists'}), 400
-
+        
         if len(password) < 6:
             return jsonify({'message': 'Password must be at least 6 characters'}), 400
-
+        
         # Create new user
         user_id = f"user_{len(USERS_DB)+1:03d}"
         hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-
+        
         USERS_DB[email] = {
             "id": user_id,
             "name": name,
@@ -179,7 +188,7 @@ def register():
             "account_number": None,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
-
+        
         # If user role, create banking details
         if role == 'user':
             account_number = str(random.randint(1000000000, 9999999999))
@@ -189,9 +198,9 @@ def register():
                 "account_type": random.choice(["Savings", "Current"]),
                 "phone": f"{random.randint(6000000000, 9999999999)}"
             })
-
+        
         return jsonify({'message': 'User registered successfully'}), 201
-
+        
     except Exception as e:
         return jsonify({'message': f'Registration failed: {str(e)}'}), 500
 
@@ -201,24 +210,25 @@ def login():
     try:
         data = request.get_json()
         user = None
-
+        
         # Handle both email and banking login
         if 'email' in data:
             email = data.get('email', '').strip().lower()
             password = data.get('password', '')
-
+            
             if email not in USERS_DB:
                 return jsonify({'message': 'Invalid credentials'}), 401
-
+            
             user = USERS_DB[email]
+            
             if not bcrypt.checkpw(password.encode('utf-8'), user['password']):
                 return jsonify({'message': 'Invalid credentials'}), 401
-
+                
         elif 'accountNumber' in data:
             # Banking login with account number and PIN
             account_number = data.get('accountNumber', '')
             pin = data.get('pin', '')
-
+            
             # Find user by account number
             for email, user_data in USERS_DB.items():
                 if user_data.get('account_number') == account_number:
@@ -227,16 +237,15 @@ def login():
                        (user_data.get('account_number') == '2345678901' and pin == '5678'):
                         user = user_data
                         break
-
+            
             if not user:
                 return jsonify({'message': 'Invalid account number or PIN'}), 401
-
         else:
             return jsonify({'message': 'Invalid login data'}), 400
-
+        
         # Create token
         token = create_token(user)
-
+        
         # Return user data
         user_response = {
             'id': user['id'],
@@ -244,12 +253,12 @@ def login():
             'email': user['email'],
             'role': user['role']
         }
-
+        
         return jsonify({
             'token': token,
             'user': user_response
         }), 200
-
+        
     except Exception as e:
         return jsonify({'message': f'Login failed: {str(e)}'}), 500
 
@@ -260,7 +269,7 @@ def create_session():
     """Create new chat session"""
     session_id = str(uuid.uuid4())
     greeting_message = f"Hello {request.current_user['name']}! I'm your enhanced AI banking assistant with advanced conversation capabilities. How can I help you today?"
-
+    
     CHAT_SESSIONS[session_id] = {
         'id': session_id,
         'user_id': request.current_user['id'],
@@ -273,7 +282,7 @@ def create_session():
         }],
         'created_at': datetime.now(timezone.utc).isoformat()
     }
-
+    
     return jsonify({
         'sessionId': session_id,
         'message': 'Session created successfully'
@@ -285,11 +294,11 @@ def get_session_messages(session_id):
     """Get messages for a session"""
     if session_id not in CHAT_SESSIONS:
         return jsonify({'message': 'Session not found'}), 404
-
+    
     session = CHAT_SESSIONS[session_id]
     if session['user_id'] != request.current_user['id'] and request.current_user['role'] != 'admin':
         return jsonify({'message': 'Access denied'}), 403
-
+    
     return jsonify(session['messages']), 200
 
 # Enhanced Chat Routes
@@ -301,13 +310,13 @@ def send_message():
         data = request.get_json()
         session_id = data.get('sessionId')
         message_text = data.get('messageText', '').strip()
-
+        
         if not message_text:
             return jsonify({'message': 'Message text is required'}), 400
-
+        
         if session_id not in CHAT_SESSIONS:
             return jsonify({'message': 'Session not found'}), 404
-
+        
         # Log user message
         user_message = {
             'sender': 'user',
@@ -316,13 +325,13 @@ def send_message():
             'user_id': request.current_user['id'],
             'session_id': session_id
         }
-
+        
         CHAT_SESSIONS[session_id]['messages'].append(user_message)
         USER_MESSAGES.append(user_message)
-
+        
         # Generate enhanced bot response using ML with session context
         bot_response = generate_enhanced_banking_response(message_text, request.current_user, session_id)
-
+        
         bot_message = {
             'sender': 'bot',
             'text': bot_response['text'],
@@ -335,12 +344,12 @@ def send_message():
             'pending_slots': bot_response.get('pending_slots', {}),
             'filled_slots': bot_response.get('filled_slots', {})
         }
-
+        
         CHAT_SESSIONS[session_id]['messages'].append(bot_message)
         BOT_MESSAGES.append(bot_message)
-
+        
         return jsonify({'bot': bot_message}), 200
-
+        
     except Exception as e:
         return jsonify({'message': f'Error processing message: {str(e)}'}), 500
 
@@ -365,7 +374,7 @@ def generate_enhanced_banking_response(message, user, session_id=None):
             pending_slots = {}
             filled_slots = {}
             chitchat_response = ''
-
+        
         # Handle chitchat responses
         if intent == 'chitchat' and chitchat_response:
             return {
@@ -376,12 +385,11 @@ def generate_enhanced_banking_response(message, user, session_id=None):
                 'method': method,
                 'conversation_complete': True
             }
-
+        
         # Handle slot filling
         if needs_slot_filling and pending_slots:
             slot_name = list(pending_slots.keys())[0]
             slot_question = pending_slots[slot_name]
-            
             return {
                 'text': f"{slot_question}\n\n🤖 ML Analysis: {confidence:.1%} confidence\n\nPlease provide the missing information to proceed.",
                 'intent': intent,
@@ -392,13 +400,13 @@ def generate_enhanced_banking_response(message, user, session_id=None):
                 'pending_slots': pending_slots,
                 'filled_slots': filled_slots
             }
-
+        
         # Extract useful entities
         amounts = [e['value'] for e in entities if e['label'] == 'AMOUNT']
         accounts = [e['value'] for e in entities if e['label'] == 'ACCOUNT_NUMBER']
         cards = [e['value'] for e in entities if e['label'] == 'CARD_TYPE']
         loan_types = [e['value'] for e in entities if e['label'] == 'LOAN_TYPE']
-
+        
         # Generate enhanced responses based on ML intent with context
         if intent == 'check_balance':
             if user.get('balance'):
@@ -412,7 +420,7 @@ def generate_enhanced_banking_response(message, user, session_id=None):
                 }
             else:
                 return generate_fallback_response("I'd be happy to help you check your balance. Please contact customer service for verification.", intent, confidence, entities, method)
-
+        
         elif intent == 'transfer_money':
             amount_text = f"₹{amounts[0]}" if amounts else filled_slots.get('amount', '[amount]')
             recipient_text = accounts[0] if accounts else filled_slots.get('recipient', '[recipient]')
@@ -435,7 +443,7 @@ def generate_enhanced_banking_response(message, user, session_id=None):
                     'method': method,
                     'needs_slot_filling': True
                 }
-
+        
         elif intent == 'apply_loan':
             loan_type = loan_types[0] if loan_types else filled_slots.get('loan_type', 'loan')
             amount = amounts[0] if amounts else filled_slots.get('amount', '')
@@ -459,7 +467,7 @@ def generate_enhanced_banking_response(message, user, session_id=None):
                     'method': method,
                     'needs_slot_filling': True
                 }
-
+        
         elif intent == 'lost_card':
             card_type = cards[0] if cards else filled_slots.get('card_type', 'card')
             
@@ -481,7 +489,7 @@ def generate_enhanced_banking_response(message, user, session_id=None):
                     'method': method,
                     'needs_slot_filling': True
                 }
-
+        
         elif intent == 'get_branch_details':
             return {
                 'text': f"I can help you find branch information.\n\n📍 Location Service: {confidence:.1%} confidence\n\n🏢 SecureBank Branch Network:\n\n🌟 Main Branches:\n• Mumbai - Nariman Point (24/7 ATM)\n• Delhi - Connaught Place (Extended Hours)\n• Bangalore - MG Road (Premium Banking)\n• Chennai - Anna Salai (Corporate Banking)\n\n📞 Contact: 1800-123-4567\n🌐 Website: www.securebank.com\n\nWhich city branch would you like detailed information about?",
@@ -491,7 +499,7 @@ def generate_enhanced_banking_response(message, user, session_id=None):
                 'method': method,
                 'conversation_complete': True
             }
-
+        
         elif intent == 'account_info':
             return {
                 'text': f"Here's your account information:\n\n👤 Account Details: {confidence:.1%} confidence\n\n📋 Your Profile:\n• Name: {user.get('name', 'N/A')}\n• Account Number: {user.get('account_number', 'N/A')}\n• Account Type: {user.get('account_type', 'N/A')}\n• Balance: ₹{user.get('balance', 0):,}\n• Phone: {user.get('phone', 'N/A')}\n• Status: Active\n\nIs there any specific account information you'd like to update?",
@@ -501,7 +509,7 @@ def generate_enhanced_banking_response(message, user, session_id=None):
                 'method': method,
                 'conversation_complete': True
             }
-
+        
         elif intent == 'fallback':
             fallback_responses = [
                 f"I want to help you with your banking needs, but I didn't quite understand your request.\n\n🤖 Analysis: {confidence:.1%} confidence\n\n💡 I can assist with:\n• Balance inquiries\n• Money transfers\n• Loan applications\n• Card services\n• Branch information\n\nCould you please rephrase your question or choose from the options above?",
@@ -518,10 +526,10 @@ def generate_enhanced_banking_response(message, user, session_id=None):
                 'method': method,
                 'conversation_complete': False
             }
-
+        
         else:  # general_inquiry
             return generate_general_response(user, intent, confidence, entities, method)
-
+            
     except Exception as e:
         print(f"Error in enhanced response generation: {e}")
         return fallback_banking_response(message, user)
@@ -563,7 +571,7 @@ def fallback_analysis(message):
     """Fallback analysis when ML is not available"""
     message_lower = message.lower()
     entities = []
-
+    
     if any(word in message_lower for word in ['balance', 'amount', 'money']):
         return 'check_balance', 0.8, entities, 'rule'
     elif any(word in message_lower for word in ['transfer', 'send', 'pay']):
@@ -588,10 +596,10 @@ def analyze_query_api():
     try:
         data = request.get_json()
         query = data.get('query', '').strip()
-
+        
         if not query:
             return jsonify({'message': 'Query is required'}), 400
-
+        
         # Use enhanced ML-based analysis if available
         if analyze_query:
             result = analyze_query(query)
@@ -605,7 +613,7 @@ def analyze_query_api():
                 'entities': entities,
                 'method': method
             }), 200
-
+            
     except Exception as e:
         return jsonify({'message': f'Analysis failed: {str(e)}'}), 500
 
@@ -634,10 +642,9 @@ def refresh_analytics():
     total_queries = len(USER_MESSAGES)
     success_queries = len([msg for msg in BOT_MESSAGES if msg.get('confidence', 0) > 0.7])
     success_rate = (success_queries / total_queries) if total_queries > 0 else 0
-
     intents = list(set([msg.get('intent', 'unknown') for msg in BOT_MESSAGES]))
     entities = sum(len(msg.get('entities', [])) for msg in BOT_MESSAGES)
-
+    
     return jsonify({
         'queries': total_queries,
         'success': success_rate,
@@ -652,10 +659,10 @@ def download_logs():
     """Download logs as CSV"""
     output = io.StringIO()
     writer = csv.writer(output)
-
+    
     # Write header
     writer.writerow(['Timestamp', 'User', 'Message', 'Intent', 'Confidence', 'Method'])
-
+    
     # Write data
     for i, user_msg in enumerate(USER_MESSAGES):
         bot_msg = BOT_MESSAGES[i] if i < len(BOT_MESSAGES) else {}
@@ -667,11 +674,12 @@ def download_logs():
             bot_msg.get('confidence', ''),
             bot_msg.get('method', '')
         ])
-
+    
     output.seek(0)
     response = make_response(output.getvalue())
     response.headers['Content-Type'] = 'text/csv'
     response.headers['Content-Disposition'] = 'attachment; filename=enhanced_chat_logs.csv'
+    
     return response
 
 @app.route('/api/admin/faq', methods=['GET'])
@@ -690,20 +698,20 @@ def create_faq():
         data = request.get_json()
         question = data.get('question', '').strip()
         answer = data.get('answer', '').strip()
-
+        
         if not question or not answer:
             return jsonify({'message': 'Question and answer are required'}), 400
-
+        
         new_faq = {
             '_id': f"faq_{len(FAQS_DB) + 1:03d}",
             'question': question,
             'answer': answer,
             'created_at': datetime.now(timezone.utc).isoformat()
         }
-
+        
         FAQS_DB.append(new_faq)
         return jsonify(new_faq), 201
-
+        
     except Exception as e:
         return jsonify({'message': f'Error creating FAQ: {str(e)}'}), 500
 
@@ -733,7 +741,7 @@ def health_check():
         'ml_enabled': analyze_query is not None,
         'features': [
             'Structured conversation flows',
-            'Context-aware responses',
+            'Context-aware responses', 
             'Graceful fallback handling',
             'Natural chitchat responses',
             'Slot filling for information gathering'
