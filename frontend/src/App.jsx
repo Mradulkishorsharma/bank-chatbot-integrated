@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import Login from './auth/Login.jsx';
+import Login from './auth/login.jsx'; // Fixed: lowercase login.jsx
 import Register from './auth/Register.jsx';
 import ChatWindow from './components/ChatWindow.jsx';
 import AdminDashboard from './admin/AdminDashboard.jsx';
@@ -11,7 +11,7 @@ function App() {
   const { token, role } = useAuthStore();
 
   const Protected = ({ children }) => token ? children : <Navigate to="/login" />;
-  const AdminOnly = ({ children }) => token && role === 'admin' ? children : <Navigate to="/dashboard" />;
+  const AdminOnly = ({ children }) => token && role === 'admin' ? children : <Navigate to="/login" />;
   const UserOnly = ({ children }) => token && role === 'user' ? children : <Navigate to="/login" />;
 
   return (
@@ -21,49 +21,60 @@ function App() {
       <Route path="/register" element={!token ? <Register /> : (role === 'admin' ? <Navigate to="/admin/dashboard" /> : <Navigate to="/dashboard" />)} />
 
       {/* Protected User Routes */}
-      <Route path="/dashboard" element={
-        <UserOnly>
-          <UserDashboard />
-        </UserOnly>
-      } />
+      <Route 
+        path="/dashboard" 
+        element={
+          <UserOnly>
+            <UserDashboard />
+          </UserOnly>
+        } 
+      />
       
-      <Route path="/chat" element={
-        <Protected>
-          <ChatWindow />
-        </Protected>
-      } />
+      <Route 
+        path="/chat" 
+        element={
+          <UserOnly>
+            <ChatWindow />
+          </UserOnly>
+        } 
+      />
       
-      <Route path="/chat/:sessionId" element={
-        <Protected>
-          <ChatWindow />
-        </Protected>
-      } />
+      <Route 
+        path="/intent" 
+        element={
+          <UserOnly>
+            <IntentEntityRecognizer />
+          </UserOnly>
+        } 
+      />
 
       {/* Admin Routes */}
-      <Route path="/admin/dashboard" element={
-        <AdminOnly>
-          <AdminDashboard />
-        </AdminOnly>
-      } />
+      <Route 
+        path="/admin/dashboard" 
+        element={
+          <AdminOnly>
+            <AdminDashboard />
+          </AdminOnly>
+        } 
+      />
 
-      <Route path="/admin/intent-recognizer" element={
-        <AdminOnly>
-          <IntentEntityRecognizer />
-        </AdminOnly>
-      } />
+      <Route 
+        path="/admin/*" 
+        element={
+          <AdminOnly>
+            <AdminDashboard />
+          </AdminOnly>
+        } 
+      />
 
       {/* Default redirects */}
-      <Route path="/" element={
-        token ? (
-          role === 'admin' ? <Navigate to="/admin/dashboard" /> : <Navigate to="/dashboard" />
-        ) : <Navigate to="/login" />
-      } />
+      <Route path="/" element={!token ? <Navigate to="/login" /> : (
+        role === 'admin' ? <Navigate to="/admin/dashboard" /> : <Navigate to="/dashboard" />
+      )} />
       
-      <Route path="*" element={
-        token ? (
-          role === 'admin' ? <Navigate to="/admin/dashboard" /> : <Navigate to="/dashboard" />
-        ) : <Navigate to="/login" />
-      } />
+      <Route path="*" element={!token ? <Navigate to="/login" /> : (
+        role === 'admin' ? <Navigate to="/admin/dashboard" /> : <Navigate to="/dashboard" />
+      )} />
     </Routes>
   );
 }
