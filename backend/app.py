@@ -29,7 +29,7 @@ app = Flask(__name__,
             template_folder='../frontend/dist')
 
 app.config['SECRET_KEY'] = 'securebank_jwt_secret_key_2024'
-CORS(app, origins=["http://localhost:5173", "http://127.0.0.1:5173"])
+CORS(app, origins=["http://localhost:5173", "http://127.0.0.1:5173","https://bank-chatbot-integrated.onrender.com"])
 
 # React app serve करने के लिए catch-all route
 @app.route('/', defaults={'path': ''})

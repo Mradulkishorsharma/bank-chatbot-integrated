@@ -8,75 +8,88 @@ import IntentEntityRecognizer from './components/IntentEntityRecognizer.jsx';
 import useAuthStore from './store/authStore.jsx';
 
 function App() {
-  const { token, role } = useAuthStore();
+const { token, role } = useAuthStore();
 
+  const Protected = ({ children }) => token ? children : <Navigate to="/login" replace />;
+  const AdminOnly = ({ children }) => token && role === 'admin' ? children : <Navigate to="/login" replace />;
   const Protected = ({ children }) => token ? children : <Navigate to="/login" />;
-  const AdminOnly = ({ children }) => token && role === 'admin' ? children : <Navigate to="/login" />;
+  const AdminOnly = ({ children }) => token && role === 'admin' ? children : <Navigate to="/dashboard" />;
   const UserOnly = ({ children }) => token && role === 'user' ? children : <Navigate to="/login" />;
 
-  return (
-    <Routes>
-      {/* Public Routes */}
+return (
+<Routes>
+{/* Public Routes */}
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+
+      {/* Protected Routes */}
+      <Route
+        path="/chat"
+        element={<Protected><ChatWindow /></Protected>}
+      />
+      <Route
+        path="/chat/:sessionId"
+        element={<Protected><ChatWindow /></Protected>}
+      />
+      <Route
+        path="/admin/dashboard"
+        element={<AdminOnly><AdminDashboard /></AdminOnly>}
+      />
+      <Route
+        path="/nlu"
+        element={<Protected><IntentEntityRecognizer /></Protected>}
+      />
       <Route path="/login" element={!token ? <Login /> : (role === 'admin' ? <Navigate to="/admin/dashboard" /> : <Navigate to="/dashboard" />)} />
       <Route path="/register" element={!token ? <Register /> : (role === 'admin' ? <Navigate to="/admin/dashboard" /> : <Navigate to="/dashboard" />)} />
 
       {/* Protected User Routes */}
-      <Route 
-        path="/dashboard" 
-        element={
-          <UserOnly>
-            <UserDashboard />
-          </UserOnly>
-        } 
-      />
+      <Route path="/dashboard" element={
+        <UserOnly>
+          <UserDashboard />
+        </UserOnly>
+      } />
       
-      <Route 
-        path="/chat" 
-        element={
-          <UserOnly>
-            <ChatWindow />
-          </UserOnly>
-        } 
-      />
+      <Route path="/chat" element={
+        <Protected>
+          <ChatWindow />
+        </Protected>
+      } />
       
-      <Route 
-        path="/intent" 
-        element={
-          <UserOnly>
-            <IntentEntityRecognizer />
-          </UserOnly>
-        } 
-      />
+      <Route path="/chat/:sessionId" element={
+        <Protected>
+          <ChatWindow />
+        </Protected>
+      } />
 
       {/* Admin Routes */}
-      <Route 
-        path="/admin/dashboard" 
-        element={
-          <AdminOnly>
-            <AdminDashboard />
-          </AdminOnly>
-        } 
-      />
+      <Route path="/admin/dashboard" element={
+        <AdminOnly>
+          <AdminDashboard />
+        </AdminOnly>
+      } />
 
-      <Route 
-        path="/admin/*" 
-        element={
-          <AdminOnly>
-            <AdminDashboard />
-          </AdminOnly>
-        } 
-      />
+      <Route path="/admin/intent-recognizer" element={
+        <AdminOnly>
+          <IntentEntityRecognizer />
+        </AdminOnly>
+      } />
 
-      {/* Default redirects */}
-      <Route path="/" element={!token ? <Navigate to="/login" /> : (
-        role === 'admin' ? <Navigate to="/admin/dashboard" /> : <Navigate to="/dashboard" />
-      )} />
+{/* Default redirects */}
+      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="/" element={
+        token ? (
+          role === 'admin' ? <Navigate to="/admin/dashboard" /> : <Navigate to="/dashboard" />
+        ) : <Navigate to="/login" />
+      } />
       
-      <Route path="*" element={!token ? <Navigate to="/login" /> : (
-        role === 'admin' ? <Navigate to="/admin/dashboard" /> : <Navigate to="/dashboard" />
-      )} />
-    </Routes>
-  );
+      <Route path="*" element={
+        token ? (
+          role === 'admin' ? <Navigate to="/admin/dashboard" /> : <Navigate to="/dashboard" />
+        ) : <Navigate to="/login" />
+      } />
+</Routes>
+);
 }
 
 export default App;
