@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE = 'https://bank-chatbot-integrated.onrender.com';
+const API_BASE = 'https://bank-chatbot-integrated.onrender.com/api';
 
 
 const apiClient = axios.create({
