@@ -13,7 +13,15 @@ function App() {
   // Single declaration only - removed duplicates
   const Protected = ({ children }) => token ? children : <Navigate to="/login" replace />;
   const AdminOnly = ({ children }) => token && role === 'admin' ? children : <Navigate to="/login" replace />;
-  const UserOnly = ({ children }) => token && role === 'user' ? children : <Navigate to="/login" />;
+  const UserOnly = ({ children }) => {
+  if (!token) {
+    return <Navigate to="/login" />;
+  }
+  if (role !== 'user') {
+    return <Navigate to="/dashboard" />; // Or wherever non-users should go
+  }
+  return children;
+};
 
   return (
     <Routes>
@@ -31,14 +39,15 @@ function App() {
         } 
       />
       
-      <Route 
-        path="/chat" 
-        element={
-          <UserOnly>
-            <ChatWindow />
-          </UserOnly>
-        } 
-      />
+      <Route
+  path="/chat"
+  element={
+    <UserOnly>
+      <ChatWindow />
+    </UserOnly>
+  }
+/>
+
       
       <Route 
         path="/intent" 

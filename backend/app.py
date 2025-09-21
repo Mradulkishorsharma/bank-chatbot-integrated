@@ -289,7 +289,6 @@ def create_session():
     }), 201
 
 @app.route('/api/session/messages/<session_id>', methods=['GET'])
-@token_required
 def get_session_messages(session_id):
     """Get messages for a session"""
     if session_id not in CHAT_SESSIONS:
