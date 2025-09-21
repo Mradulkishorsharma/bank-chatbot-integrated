@@ -29,7 +29,17 @@ app = Flask(__name__,
             template_folder='../frontend/dist')
 
 app.config['SECRET_KEY'] = 'securebank_jwt_secret_key_2024'
-CORS(app, origins=["http://localhost:5173", "http://127.0.0.1:5173","https://bank-chatbot-integrated.onrender.com"])
+
+CORS(app,
+     origins=[
+         "http://localhost:5173",
+         "http://127.0.0.1:5173",
+         "https://bank-chatbot-integrated.onrender.com"
+     ],
+     supports_credentials=True,
+     expose_headers=["Authorization"]
+)
+
 
 # React app serve करने के लिए catch-all route
 @app.route('/', defaults={'path': ''})
@@ -289,6 +299,7 @@ def create_session():
     }), 201
 
 @app.route('/api/session/messages/<session_id>', methods=['GET'])
+@token_required
 def get_session_messages(session_id):
     """Get messages for a session"""
     if session_id not in CHAT_SESSIONS:
@@ -755,4 +766,4 @@ if __name__ == '__main__':
     print("🧠 Enhanced ML Intent Recognition with Context & Slot Filling")
     print("💬 Conversation Flow Management Active")
     print("🌐 Server running at: http://localhost:3000")
-    app.run(debug=True, host='0.0.0.0', port=3000)
+    app.run(debug=False, host='0.0.0.0', port=3000)
