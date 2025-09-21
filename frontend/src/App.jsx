@@ -15,10 +15,10 @@ function App() {
   const AdminOnly = ({ children }) => token && role === 'admin' ? children : <Navigate to="/login" replace />;
   const UserOnly = ({ children }) => {
   if (!token) {
-    return <Navigate to="/login" />;
-  }
+      return <Navigate to="/login" replace />;
+    }
   if (role !== 'user') {
-    return <Navigate to="/dashboard" />; // Or wherever non-users should go
+    return <Navigate to="/dashboard" replace />; // Or wherever non-users should go
   }
   return children;
 };
