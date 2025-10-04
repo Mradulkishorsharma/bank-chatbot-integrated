@@ -14,7 +14,7 @@ import os
 
 # Import ML NLU service
 try:
-    from nlu_service_enhanced import analyze_query
+    from nlu_service import analyze_query
     print("✅ Enhanced ML NLU Service imported successfully")
 except ImportError:
     try:
