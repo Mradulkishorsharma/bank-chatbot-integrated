@@ -10,4 +10,3 @@ gunicorn==23.0.0
 scikit-learn
 transformers
 torch
-spacy
