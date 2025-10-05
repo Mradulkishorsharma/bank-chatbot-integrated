@@ -8,6 +8,13 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 
+import os
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, 'models', 'intent_model.pkl')
+CHITCHAT_PATH = os.path.join(BASE_DIR, 'models', 'chitchat_patterns.json')
+DATA_PATH = os.path.join(BASE_DIR, 'banking_queries.csv')
+
 class EnhancedNLU:
     def __init__(self):
         self.model = None
@@ -21,6 +28,7 @@ class EnhancedNLU:
         """Load ML models and fallback data"""
         try:
             # Load main intent model
+            print("Looking for model at:", MODEL_PATH)
             with open('models/intent_model.pkl', 'rb') as f:
                 self.model = pickle.load(f)
             print("✅ ML Intent model loaded successfully")
@@ -30,6 +38,7 @@ class EnhancedNLU:
 
         try:
             # Load chitchat patterns
+            print("Looking for chitchat patterns at:", CHITCHAT_PATH)
             with open('models/chitchat_patterns.json', 'r') as f:
                 self.chitchat_patterns = json.load(f)
         except FileNotFoundError:
@@ -72,7 +81,8 @@ class EnhancedNLU:
     def train_model(self):
         """Train the intent classification model"""
         try:
-            df = pd.read_csv('banking_queries.csv')
+            print("Looking for data at:", DATA_PATH)
+            df = pd.read_csv(DATA_PATH)
             df['text'] = df['text'].apply(self.preprocess_text)
             df = df.dropna(subset=['text', 'intent'])
             
